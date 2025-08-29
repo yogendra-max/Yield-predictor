@@ -1,9 +1,12 @@
+# api.py
+import os
 from flask import Flask, request, jsonify
 import joblib
 import pandas as pd
-import os
+from flask_cors import CORS
 
 app = Flask(__name__)
+CORS(app)  # Enable CORS for frontend access
 
 # -------------------------
 # 1. Load all models from models/ folder
@@ -11,10 +14,8 @@ app = Flask(__name__)
 MODEL_DIR = "models"
 models = {}
 
-# Automatically load all .pkl files
 for file in os.listdir(MODEL_DIR):
     if file.endswith(".pkl"):
-        # Model name = filename without '_yield_model.pkl' or '.pkl'
         name = file.replace("_yield_model.pkl", "").replace(".pkl", "")
         models[name] = joblib.load(os.path.join(MODEL_DIR, file))
 
@@ -33,17 +34,13 @@ def predict_yield():
         if not data:
             return jsonify({"error": "No input data provided"}), 400
 
-        # Choose model (default = best if exists, else first available)
         model_name = data.get("model", "best" if "best" in models else list(models.keys())[0])
         if model_name not in models:
             return jsonify({
-                "error": f"Invalid model '{model_name}'. Available models: {list(models.keys())}"
+                "error": f"Invalid model '{model_name}'. Available: {list(models.keys())}"
             }), 400
 
-        # Prepare DataFrame (exclude "model" key)
         df = pd.DataFrame([{k: v for k, v in data.items() if k != "model"}])
-
-        # Predict
         prediction = models[model_name].predict(df)[0]
 
         return jsonify({
@@ -58,4 +55,5 @@ def predict_yield():
 # 3. Run server
 # -------------------------
 if __name__ == "__main__":
-    app.run(debug=True)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port, debug=True)
